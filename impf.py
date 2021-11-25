@@ -1,6 +1,7 @@
+import argparse
+import datetime
 import json
 import logging
-import os
 from datetime import date
 from typing import Dict, Optional, Union
 from urllib.parse import urlsplit, urlencode, urlunsplit, parse_qs
@@ -12,7 +13,7 @@ from requests import Response, HTTPError
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
-    level=logging.DEBUG,
+    level=logging.INFO,
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
@@ -265,9 +266,41 @@ class ImpfChecker:
             )
 
 
-checker = ImpfChecker(
-    username=os.environ.get("USER"),
-    password=os.environ.get("PASSWORD"),
-    citizen_id=os.environ.get("CITIZEN_ID"),
-)
-checker.find()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Appointment checker and booker for Bavarian vaccination centres"
+    )
+    parser.add_argument(
+        "--citizen-id",
+        type=str,
+        required=True,
+        help="Your citizen ID. Find it in the address bar of your browser after selecting the person in the web portal.",
+    )
+    parser.add_argument(
+        "--email", type=str, required=True, help="Your login email address"
+    )
+    parser.add_argument(
+        "--password", type=str, required=True, help="Your login password"
+    )
+    parser.add_argument(
+        "--earliest-day",
+        type=datetime.date.fromisoformat,
+        help="The earliest day from which to find an appointment, in ISO format (YYYY-MM-DD)",
+    )
+    parser.add_argument(
+        "--book",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Whether to book the appointment if found",
+    )
+    args = parser.parse_args()
+
+    checker = ImpfChecker(
+        username=args.email,
+        password=args.password,
+        citizen_id=args.citizen_id,
+    )
+    checker.find(earliest_day=args.earliest_day.isoformat(), book=args.book)
+
+    if args.book:
+        checker.print_appointments()
