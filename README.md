@@ -32,7 +32,7 @@ python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@ex
 Full help: 
 ```
 $ python impf.py -h                                                                                                                                                                                                                                                                Py byImpf 14:25:01
-usage: impf.py [-h] --citizen-id CITIZEN_ID --email EMAIL --password PASSWORD [--earliest-day EARLIEST_DAY] [--book | --no-book]
+usage: impf.py [-h] --citizen-id CITIZEN_ID --email EMAIL --password PASSWORD [--earliest-day EARLIEST_DAY] [--interval INTERVAL] [--book | --no-book]
 
 Appointment checker and booker for Bavarian vaccination centres
 
@@ -44,6 +44,7 @@ optional arguments:
   --password PASSWORD   Your login password
   --earliest-day EARLIEST_DAY
                         The earliest day from which to find an appointment, in ISO format (YYYY-MM-DD)
+  --interval INTERVAL   The interval in seconds between checks for appointments. If not passed, only one attempt is made.
   --book, --no-book     Whether to book the appointment if found (default: False)
 ```
 

@@ -2,6 +2,8 @@ import argparse
 import datetime
 import json
 import logging
+import sched
+import time
 from datetime import date
 from typing import Dict, Optional, Union
 from urllib.parse import urlsplit, urlencode, urlunsplit, parse_qs
@@ -10,6 +12,7 @@ from uuid import uuid4
 import requests
 from bs4 import BeautifulSoup
 from requests import Response, HTTPError
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
@@ -288,6 +291,11 @@ if __name__ == "__main__":
         help="The earliest day from which to find an appointment, in ISO format (YYYY-MM-DD)",
     )
     parser.add_argument(
+        "--interval",
+        type=int,
+        help="The interval in seconds between checks",
+    )
+    parser.add_argument(
         "--book",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -300,7 +308,16 @@ if __name__ == "__main__":
         password=args.password,
         citizen_id=args.citizen_id,
     )
-    checker.find(earliest_day=args.earliest_day.isoformat(), book=args.book)
+
+    if args.interval is not None:
+        for attempt in Retrying(wait=wait_fixed(args.interval)):
+            with attempt:
+                if not checker.find(
+                    earliest_day=args.earliest_day.isoformat(), book=args.book
+                ):
+                    raise Exception("Unsuccessful attempt")
+    else:
+        checker.find(earliest_day=args.earliest_day.isoformat(), book=args.book)
 
     if args.book:
         checker.print_appointments()
