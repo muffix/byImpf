@@ -46,3 +46,17 @@ optional arguments:
                         The earliest day from which to find an appointment, in ISO format (YYYY-MM-DD)
   --book, --no-book     Whether to book the appointment if found (default: False)
 ```
+
+## Running in Docker
+
+Alternatively, you can run the checker in a Docker container.
+
+First build the image:
+```shell
+docker build -t byImpf .
+```
+
+Then run it, passing some or all of the arguments listed above:
+```shell
+docker run --rm byImpf --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
+```
