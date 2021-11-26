@@ -2,17 +2,15 @@ import argparse
 import datetime
 import json
 import logging
-import sched
-import time
 from datetime import date
 from typing import Dict, Optional, Union
-from urllib.parse import urlsplit, urlencode, urlunsplit, parse_qs
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import requests
 from bs4 import BeautifulSoup
-from requests import Response, HTTPError
-from tenacity import Retrying, stop_after_attempt, wait_fixed
+from requests import HTTPError, Response
+from tenacity import Retrying, wait_fixed
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)-8s %(message)s",
