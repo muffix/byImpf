@@ -254,9 +254,9 @@ class ImpfChecker:
                     True if the booking was successful or an appointment was found and no booking requested.
         """
         if earliest_day is None:
-            earliest_day = date.today().isoformat()
+            earliest_day = date.today()
 
-        appt = self._find_appointment(earliest_day)
+        appt = self._find_appointment(earliest_day.isoformat())
         if appt is None:
             logging.info("No appointment available")
             return False
@@ -380,12 +380,10 @@ def main():
             ):
                 with attempt:
                     logging.debug("Trying to find appointment (attempt %d)", i)
-                    if not checker.find(
-                        earliest_day=args.earliest_day.isoformat(), book=args.book
-                    ):
+                    if not checker.find(earliest_day=args.earliest_day, book=args.book):
                         raise Exception("Unsuccessful attempt")
     else:
-        checker.find(earliest_day=args.earliest_day.isoformat(), book=args.book)
+        checker.find(earliest_day=args.earliest_day, book=args.book)
 
     if args.book:
         checker.print_appointments()
