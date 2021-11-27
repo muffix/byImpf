@@ -2,12 +2,15 @@ import argparse
 import datetime
 import json
 import logging
+import threading
+import time
 from datetime import date
 from typing import Dict, Optional, Union
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
 
 import requests
+import schedule
 from bs4 import BeautifulSoup
 from requests import HTTPError, Response
 from tenacity import Retrying, wait_fixed
@@ -25,6 +28,21 @@ def url_with_params(url: str, query_params: Dict[str, str]) -> str:
     return urlunsplit((scheme, netloc, path, query_string, fragment))
 
 
+def run_schedule(interval=1):
+    cease_continuous_run = threading.Event()
+
+    class ScheduleThread(threading.Thread):
+        @classmethod
+        def run(cls):
+            while not cease_continuous_run.is_set():
+                schedule.run_pending()
+                time.sleep(interval)
+
+    continuous_thread = ScheduleThread()
+    continuous_thread.start()
+    return cease_continuous_run
+
+
 class ImpfChecker:
     MAIN_PAGE = "https://impfzentren.bayern/citizen/"
     LOGIN_URL = "https://ciam.impfzentren.bayern/auth/realms/C19V-Citizen/protocol/openid-connect/auth"
@@ -33,11 +51,10 @@ class ImpfChecker:
         "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
     )
 
-    @property
     def auth_token(self):
         if self._auth_token is None:
             try:
-                self._auth_token = self._login()
+                self._login()
             except HTTPError:
                 logging.error("Login failed.")
                 exit(1)
@@ -49,6 +66,20 @@ class ImpfChecker:
         self.citizen_id = citizen_id
         self.session = requests.Session()
         self._auth_token = None
+        self._refresh_token = None
+
+    def __enter__(self):
+        self.stop_schedule = run_schedule()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_schedule.set()
+
+    def reset_session(self):
+        logging.debug("Resetting the session")
+
+        self.session = requests.Session()
+        self._auth_token = None
+        self._refresh_token = None
 
     def _submit_form(
         self,
@@ -89,7 +120,7 @@ class ImpfChecker:
         }
 
         if with_auth:
-            headers["Authorization"] = f"Bearer {self.auth_token}"
+            headers["Authorization"] = f"Bearer {self.auth_token()}"
 
         headers.update(**additional_headers)
         return headers
@@ -123,8 +154,9 @@ class ImpfChecker:
         Attempts to log the user in
 
         :raise HTTPError if unsuccessful
-        :return: The authentication token
         """
+        logging.debug("Logging in")
+
         login_resp = self._submit_form(
             self._get_login_action(),
             {
@@ -139,18 +171,40 @@ class ImpfChecker:
 
         _, state = login_resp.headers.get("Location").split("#", maxsplit=1)
         code = parse_qs(state)["code"][0]
+        self.refresh_auth_token(code)
 
-        token_rsp = self._submit_form(
-            self.TOKEN_URL,
-            {
-                "code": code,
-                "grant_type": "authorization_code",
-                "client_id": "c19v-frontend",
-                "redirect_uri": "https://impfzentren.bayern/citizen/",
-            },
-        )
+        # Auth tokens are valid for 300 seconds, so let's refresh ours after 270.
+        schedule.every(270).seconds.do(self.refresh_auth_token)
+
+    def refresh_auth_token(self, code: Optional[str] = None):
+        logging.debug("Refreshing auth token")
+
+        if code:
+            token_rsp = self._submit_form(
+                self.TOKEN_URL,
+                {
+                    "code": code,
+                    "grant_type": "authorization_code",
+                    "client_id": "c19v-frontend",
+                    "redirect_uri": "https://impfzentren.bayern/citizen/",
+                },
+            )
+        else:
+            token_rsp = self._submit_form(
+                self.TOKEN_URL,
+                {
+                    "refresh_token": self._refresh_token,
+                    "grant_type": "refresh_token",
+                    "client_id": "c19v-frontend",
+                },
+            )
         token_rsp.raise_for_status()
-        return token_rsp.json()["access_token"]
+        rsp_json = token_rsp.json()
+
+        self._auth_token, self._refresh_token = (
+            rsp_json["access_token"],
+            rsp_json["refresh_token"],
+        )
 
     def _appointments_url(self, resource: Optional[str] = None):
         return self.APPOINTMENTS_URL_FORMAT.format(self.citizen_id) + (
@@ -178,6 +232,13 @@ class ImpfChecker:
         )
 
         if appt_rsp.status_code == 404:
+            return None
+
+        if appt_rsp.status_code // 100 != 2:
+            logging.debug("Unexpected status code %d", appt_rsp.status_code)
+
+        if appt_rsp.status_code == 401:
+            self.reset_session()
             return None
 
         return appt_rsp.json()
@@ -267,7 +328,7 @@ class ImpfChecker:
             )
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
         description="Appointment checker and booker for Bavarian vaccination centres"
     )
@@ -275,7 +336,10 @@ if __name__ == "__main__":
         "--citizen-id",
         type=str,
         required=True,
-        help="Your citizen ID. Find it in the address bar of your browser after selecting the person in the web portal.",
+        help=(
+            "Your citizen ID. "
+            "Find it in the address bar of your browser after selecting the person in the web portal."
+        ),
     )
     parser.add_argument(
         "--email", type=str, required=True, help="Your login email address"
@@ -291,7 +355,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--interval",
         type=int,
-        help="The interval in seconds between checks",
+        help="The interval in seconds between checks. If not passed, only one check is made.",
     )
     parser.add_argument(
         "--book",
@@ -308,14 +372,22 @@ if __name__ == "__main__":
     )
 
     if args.interval is not None:
-        for attempt in Retrying(wait=wait_fixed(args.interval)):
-            with attempt:
-                if not checker.find(
-                    earliest_day=args.earliest_day.isoformat(), book=args.book
-                ):
-                    raise Exception("Unsuccessful attempt")
+        with checker:
+            for i, attempt in enumerate(
+                Retrying(wait=wait_fixed(args.interval)), start=1
+            ):
+                with attempt:
+                    logging.debug("Trying to find appointment (attempt %d)", i)
+                    if not checker.find(
+                        earliest_day=args.earliest_day.isoformat(), book=args.book
+                    ):
+                        raise Exception("Unsuccessful attempt")
     else:
         checker.find(earliest_day=args.earliest_day.isoformat(), book=args.book)
 
     if args.book:
         checker.print_appointments()
+
+
+if __name__ == "__main__":
+    main()
