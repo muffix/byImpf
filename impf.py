@@ -282,7 +282,9 @@ class ImpfChecker:
         }
 
         book_rsp = self.session.post(
-            self._appointments_url(), payload, headers=self._headers(with_auth=True)
+            self._appointments_url(),
+            json=payload,
+            headers=self._headers(with_auth=True),
         )
 
         if book_rsp.status_code != 200:
