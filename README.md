@@ -29,6 +29,11 @@ Minimal example to find the next available appointment:
 python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
 ```
 
+You can additionally pass `--earliest-day` with the earliest acceptable date, which restricts the search to appointments after that date:
+```shell
+python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password --earliest-day=2021-12-24
+```
+
 Full help: 
 ```
 $ python impf.py -h                                                                                                                                                                                                                                                                Py byImpf 14:25:01
@@ -50,14 +55,8 @@ optional arguments:
 
 ## Running in Docker
 
-Alternatively, you can run the checker in a Docker container.
+Alternatively, you can run the checker in a Docker container, passing some or all of the arguments listed above:
 
-First build the image:
 ```shell
-docker build -t byImpf .
-```
-
-Then run it, passing some or all of the arguments listed above:
-```shell
-docker run --rm byImpf --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
+docker run --rm ghcr.io/muffix/byimpf --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
 ```
