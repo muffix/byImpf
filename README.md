@@ -53,6 +53,11 @@ optional arguments:
   --book, --no-book     Whether to book the appointment if found (default: False)
 ```
 
+#### Checking until successful
+
+You can use the optional `--interval` option to tell the script to keep trying until it succeeds in finding (or booking
+if `--book` is also passed). For example, with `--interval=60` an attempt is made every 60 seconds.
+
 ## Running in Docker
 
 Alternatively, you can run the checker in a Docker container, passing some or all of the arguments listed above:
