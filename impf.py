@@ -211,7 +211,9 @@ class ImpfChecker:
             resource if resource is not None else ""
         )
 
-    def _find_appointment(self, earliest_day) -> Optional[Dict]:
+    def _find_appointment(
+        self, earliest_day, latest_day: Optional[date]
+    ) -> Optional[Dict]:
         """
         Finds an appointment in the user's vaccination centre
 
@@ -241,13 +243,29 @@ class ImpfChecker:
             self.reset_session()
             return None
 
-        return appt_rsp.json()
+        appt = appt_rsp.json()
 
-    def find(self, earliest_day: Optional[str] = None, *, book: bool = False) -> bool:
+        if (
+            latest_day
+            and datetime.date.fromisoformat(appt["vaccinationDate"]) > latest_day
+        ):
+            # We found an appointment, but it's too far in the future
+            return None
+
+        return appt
+
+    def find(
+        self,
+        earliest_day: Optional[str] = None,
+        latest_day: Optional[str] = None,
+        *,
+        book: bool = False,
+    ) -> bool:
         """
         Finds an appointment in the user's vaccination centre
 
         :param earliest_day:    The earliest acceptable day in ISO format (YYYY-MM-DD)
+        :param latest_day:      The latest acceptable day in ISO format (YYYY-MM-DD)
         :param book:            Whether or not to book the appointment
 
         :return:    False if no appointment found or booking failed.
@@ -256,7 +274,7 @@ class ImpfChecker:
         if earliest_day is None:
             earliest_day = date.today()
 
-        appt = self._find_appointment(earliest_day.isoformat())
+        appt = self._find_appointment(earliest_day.isoformat(), latest_day)
         if appt is None:
             logging.info("No appointment available")
             return False
@@ -355,6 +373,11 @@ def main():
         help="The earliest day from which to find an appointment, in ISO format (YYYY-MM-DD)",
     )
     parser.add_argument(
+        "--latest-day",
+        type=datetime.date.fromisoformat,
+        help="The latest acceptable day for an appointment, in ISO format (YYYY-MM-DD)",
+    )
+    parser.add_argument(
         "--interval",
         type=int,
         help="The interval in seconds between checks. If not passed, only one check is made.",
@@ -380,10 +403,16 @@ def main():
             ):
                 with attempt:
                     logging.debug("Trying to find appointment (attempt %d)", i)
-                    if not checker.find(earliest_day=args.earliest_day, book=args.book):
+                    if not checker.find(
+                        earliest_day=args.earliest_day,
+                        latest_day=args.latest_day,
+                        book=args.book,
+                    ):
                         raise Exception("Unsuccessful attempt")
     else:
-        checker.find(earliest_day=args.earliest_day, book=args.book)
+        checker.find(
+            earliest_day=args.earliest_day, latest_day=args.latest_day, book=args.book
+        )
 
     if args.book:
         checker.print_appointments()
