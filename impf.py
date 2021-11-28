@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import json
 import logging
 import threading
 import time
@@ -279,7 +278,11 @@ class ImpfChecker:
             logging.info("No appointment available")
             return False
 
-        logging.info("Found appointment: %s", json.dumps(appt))
+        logging.info(
+            "Found appointment on %s at %s",
+            appt["vaccinationDate"],
+            appt["vaccinationTime"],
+        )
 
         if book:
             return self._book(appt)
