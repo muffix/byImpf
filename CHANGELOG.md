@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased changes
+
+- Added support for the `--debug` option to additionally print debug output
+
 ## v1.0.3
 
 - Increased the frequency of authentication token refreshes

@@ -14,12 +14,6 @@ from bs4 import BeautifulSoup
 from requests import HTTPError, Response
 from tenacity import Retrying, wait_fixed
 
-logging.basicConfig(
-    format="%(asctime)s %(levelname)-8s %(message)s",
-    level=logging.INFO,
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
-
 
 def url_with_params(url: str, query_params: Dict[str, str]) -> str:
     scheme, netloc, path, _, fragment = urlsplit(url)
@@ -400,7 +394,18 @@ def main():
         default=False,
         help="Whether to book the appointment if found",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Whether to print debug log output",
+    )
     args = parser.parse_args()
+
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)-8s %(message)s",
+        level=logging.DEBUG if args.debug else logging.INFO,
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
     checker = ImpfChecker(
         username=args.email, password=args.password, citizen_id=args.citizen_id
