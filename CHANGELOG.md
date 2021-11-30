@@ -1,3 +1,7 @@
+# v1.0.3
+
+- Increased the frequency of authentication token refreshes
+
 # v1.0.2
 
 - Added support for the `--latest-day` option

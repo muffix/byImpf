@@ -64,8 +64,9 @@ class ImpfChecker:
         self._password = password
         self.citizen_id = citizen_id
         self.session = requests.Session()
-        self._auth_token = None
-        self._refresh_token = None
+        self._auth_token: Optional[str] = None
+        self._auth_token_expiry: Optional[datetime.datetime] = None
+        self._refresh_token: Optional[str] = None
 
     def __enter__(self):
         self.stop_schedule = run_schedule()
@@ -81,10 +82,7 @@ class ImpfChecker:
         self._refresh_token = None
 
     def _submit_form(
-        self,
-        url: str,
-        body: Dict[str, str],
-        allow_redirects: bool = True,
+        self, url: str, body: Dict[str, str], allow_redirects: bool = True
     ) -> Response:
         """
         Submits a form to the API
@@ -158,11 +156,7 @@ class ImpfChecker:
 
         login_resp = self._submit_form(
             self._get_login_action(),
-            {
-                "username": self._user,
-                "password": self._password,
-                "credentialId": "",
-            },
+            {"username": self._user, "password": self._password, "credentialId": ""},
             allow_redirects=False,
         )
 
@@ -172,13 +166,30 @@ class ImpfChecker:
         code = parse_qs(state)["code"][0]
         self.refresh_auth_token(code)
 
-        # Auth tokens are valid for 300 seconds, so let's refresh ours after 270.
-        schedule.every(270).seconds.do(self.refresh_auth_token)
+        # Check every 10 seconds if we need to refresh the auth token
+        schedule.every(10).seconds.do(self.refresh_auth_token)
+
+    @property
+    def is_auth_token_expired(self) -> bool:
+        return self._auth_token_expiry and self._auth_token_expiry - datetime.datetime.now() < datetime.timedelta(
+            seconds=30
+        )
 
     def refresh_auth_token(self, code: Optional[str] = None):
-        logging.debug("Refreshing auth token")
+        """
+        Authentication tokens are required for calls to the API. They are only valid for a limited time, but can be
+        refreshed. This method fetches the latest authentication token if necessary.
+
+        Optionally accepts an authorisation code obtained from the login endpoint. If an authentication code is passed,
+        this method fetches the matching token.
+
+        :param code: Authorisation code retrieved from the login endpoint
+        """
+        if not code and not self.is_auth_token_expired:
+            return
 
         if code:
+            logging.debug("Getting auth token from auth code")
             token_rsp = self._submit_form(
                 self.TOKEN_URL,
                 {
@@ -189,6 +200,7 @@ class ImpfChecker:
                 },
             )
         else:
+            logging.debug("Refreshing auth token")
             token_rsp = self._submit_form(
                 self.TOKEN_URL,
                 {
@@ -200,8 +212,10 @@ class ImpfChecker:
         token_rsp.raise_for_status()
         rsp_json = token_rsp.json()
 
-        self._auth_token, self._refresh_token = (
+        self._auth_token, self._auth_token_expiry, self._refresh_token = (
             rsp_json["access_token"],
+            datetime.datetime.now()
+            + datetime.timedelta(seconds=rsp_json["expires_in"]),
             rsp_json["refresh_token"],
         )
 
@@ -223,11 +237,7 @@ class ImpfChecker:
         appt_rsp = self.session.get(
             url_with_params(
                 self._appointments_url("/next"),
-                {
-                    "timeOfDay": "ALL_DAY",
-                    "lastDate": earliest_day,
-                    "lastTime": "00:00",
-                },
+                {"timeOfDay": "ALL_DAY", "lastDate": earliest_day, "lastTime": "00:00"},
             ),
             headers=self._headers(with_auth=True),
         )
@@ -297,10 +307,7 @@ class ImpfChecker:
         :return: True if the booking was successful, False otherwise
         """
 
-        payload["reminderChannel"] = {
-            "reminderByEmail": True,
-            "reminderBySms": True,
-        }
+        payload["reminderChannel"] = {"reminderByEmail": True, "reminderBySms": True}
 
         book_rsp = self.session.post(
             self._appointments_url(),
@@ -394,9 +401,7 @@ def main():
     args = parser.parse_args()
 
     checker = ImpfChecker(
-        username=args.email,
-        password=args.password,
-        citizen_id=args.citizen_id,
+        username=args.email, password=args.password, citizen_id=args.citizen_id
     )
 
     if args.interval is not None:
