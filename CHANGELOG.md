@@ -1,15 +1,19 @@
-# v1.0.3
+# Changelog
+
+## v1.0.3
 
 - Increased the frequency of authentication token refreshes
+- Added pre-commit hooks config
 
-# v1.0.2
+## v1.0.2
 
 - Added support for the `--latest-day` option
 
-# v1.0.1
+## v1.0.1
 
-- Fixed a bug where the `--earliest-day` option wasn't optional, but should have been
+- Fixed a bug where the `--earliest-day` option wasn't optional,
+  but should have been
 
-# v1.0.0
+## v1.0.0
 
 - Initial release
