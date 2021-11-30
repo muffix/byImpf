@@ -171,8 +171,10 @@ class ImpfChecker:
 
     @property
     def is_auth_token_expired(self) -> bool:
-        return self._auth_token_expiry and self._auth_token_expiry - datetime.datetime.now() < datetime.timedelta(
-            seconds=30
+        return (
+            self._auth_token_expiry
+            and self._auth_token_expiry - datetime.datetime.now()
+            < datetime.timedelta(seconds=30)
         )
 
     def refresh_auth_token(self, code: Optional[str] = None):
