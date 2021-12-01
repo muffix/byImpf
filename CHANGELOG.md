@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased changes
+## UNRELEASED
 
 - Added support for the `--debug` option to additionally print debug output
 
@@ -15,8 +15,7 @@
 
 ## v1.0.1
 
-- Fixed a bug where the `--earliest-day` option wasn't optional,
-  but should have been
+- Fixed a bug where the `--earliest-day` option wasn't optional, but should have been
 
 ## v1.0.0
 
