@@ -312,7 +312,7 @@ class ImpfChecker:
         )
 
         if book_rsp.status_code != 200:
-            logging.error(f"Error booking appointment. Status %d", book_rsp.status_code)
+            logging.error("Error booking appointment. Status %s", book_rsp.status_code)
             return False
 
         logging.info("Appointment booked.")

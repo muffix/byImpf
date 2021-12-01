@@ -1,11 +1,11 @@
 # ImpfChecker
 
-Basic checker for Bavaria's booking portal for vaccination appointments. 
-Checks the portal for the first available appointment and prints it. 
+Basic checker for Bavaria's booking portal for vaccination appointments.
+Checks the portal for the first available appointment and prints it.
 
 ## Requirements
 
-- You need to be registered with the portal at https://impfzentren.bayern/citizen/
+- You need to be registered with the [vaccination portal](https://impfzentren.bayern/citizen/)
 - You need to have selected a vaccination centre in the portal
 - Python 3
 
@@ -13,7 +13,8 @@ Checks the portal for the first available appointment and prints it.
 
 ### Install the dependencies
 
-Just run 
+Just run
+
 ```shell
 pip install -r requirements.txt
 ```
@@ -21,21 +22,26 @@ pip install -r requirements.txt
 ### Run the checker
 
 The checker requires your username, password, and citizen ID.
-You can find your citizen ID if you login to the portal and select the person. The address bar in your browser contains 
-the ID in the following format: `https://impfzentren.bayern/citizen/overview/{CITIZEN_ID}`.
+You can find your citizen ID if you login to the portal and select the person.
+The address bar in your browser contains the ID in the following format:
+`https://impfzentren.bayern/citizen/overview/{CITIZEN_ID}`.
 
 Minimal example to find the next available appointment:
+
 ```shell
 python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
 ```
 
-You can additionally pass `--earliest-day` with the earliest acceptable date, which restricts the search to appointments after that date:
+You can additionally pass `--earliest-day` with the earliest acceptable date,
+which restricts the search to appointments after that date:
+
 ```shell
 python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password --earliest-day=2021-12-24
 ```
 
-Full help: 
-```
+Full help:
+
+```text
 $ python impf.py -h                                                                                                                                                                                                                                                                Py byImpf 14:25:01
 usage: impf.py [-h] --citizen-id CITIZEN_ID --email EMAIL --password PASSWORD [--earliest-day EARLIEST_DAY] [--latest-day LATEST_DAY] [--interval INTERVAL] [--book | --no-book]
 
