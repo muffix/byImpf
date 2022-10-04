@@ -29,14 +29,14 @@ The address bar in your browser contains the ID in the following format:
 Minimal example to find the next available appointment:
 
 ```shell
-python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
+python byimpf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password
 ```
 
 You can additionally pass `--earliest-day` with the earliest acceptable date,
 which restricts the search to appointments after that date:
 
 ```shell
-python impf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password --earliest-day=2021-12-24
+python byimpf.py --citizen-id=AAAAAAAA-0000-0000-0000-AAAAAAAAAAAA --email=user@example.com --password=my_password --earliest-day=2021-12-24
 ```
 
 Full help:
