@@ -2,6 +2,7 @@ import datetime
 import logging
 import threading
 import time
+from dataclasses import dataclass
 from datetime import date
 from enum import Enum
 from typing import Dict, Optional, Union
@@ -51,13 +52,33 @@ class Vaccine(Enum):
         raise ValueError("Unknown vaccine ID")
 
 
+@dataclass
+class AppointmentOptions:
+    earliest_day: date
+    latest_day: date
+    book: bool
+    variant: Variant
+    first_vaccine: Vaccine
+    vaccination_type: VaccinationType
+
+    def __repr__(self) -> str:
+        return "\n".join(
+            [
+                f"First possible date: {self.earliest_day or 'earliest available'}",
+                f"Last possible date: {self.latest_day or 'no limit'}",
+                f"Vaccination type: {self.vaccination_type.value}",
+                f"First vaccination: {self.first_vaccine.value if self.first_vaccine else '?'}",
+                f"Variant: {self.variant or 'any'}",
+                f"{'Will' if self.book else 'Will not'} attempt to book",
+            ]
+        )
+
+
 class ImpfChecker:
     MAIN_PAGE = "https://impfzentren.bayern/citizen/"
     LOGIN_URL = "https://ciam.impfzentren.bayern/auth/realms/C19V-Citizen/protocol/openid-connect/auth"
     TOKEN_URL = "https://ciam.impfzentren.bayern/auth/realms/C19V-Citizen/protocol/openid-connect/token"
-    APPOINTMENTS_URL_FORMAT = (
-        "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
-    )
+    APPOINTMENTS_URL_FORMAT = "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
     NTFY_SH_URL = "https://ntfy.sh/"
 
     def auth_token(self):
@@ -113,9 +134,7 @@ class ImpfChecker:
         self._auth_token = None
         self._refresh_token = None
 
-    def _submit_form(
-        self, url: str, body: Dict[str, str], allow_redirects: bool = True
-    ) -> Response:
+    def _submit_form(self, url: str, body: Dict[str, str], allow_redirects: bool = True) -> Response:
         """
         Submits a form to the API
 
@@ -128,9 +147,7 @@ class ImpfChecker:
 
         return self.session.post(
             url,
-            headers=self._headers(
-                **{"Content-Type": "application/x-www-form-urlencoded"}
-            ),
+            headers=self._headers(**{"Content-Type": "application/x-www-form-urlencoded"}),
             data=body,
             allow_redirects=allow_redirects,
         )
@@ -174,9 +191,7 @@ class ImpfChecker:
         """
         login_form_rsp = self.session.get(self._login_url, headers=self._headers())
         login_form_rsp.raise_for_status()
-        return BeautifulSoup(login_form_rsp.text, "html.parser").find(
-            id="kc-form-login"
-        )["action"]
+        return BeautifulSoup(login_form_rsp.text, "html.parser").find(id="kc-form-login")["action"]
 
     def _login(self):
         """
@@ -203,10 +218,8 @@ class ImpfChecker:
 
     @property
     def is_auth_token_expired(self) -> bool:
-        return (
-            self._auth_token_expiry
-            and self._auth_token_expiry - datetime.datetime.now()
-            < datetime.timedelta(seconds=30)
+        return self._auth_token_expiry and self._auth_token_expiry - datetime.datetime.now() < datetime.timedelta(
+            seconds=30
         )
 
     def refresh_auth_token(self, code: Optional[str] = None):
@@ -248,45 +261,37 @@ class ImpfChecker:
 
         self._auth_token, self._auth_token_expiry, self._refresh_token = (
             rsp_json["access_token"],
-            datetime.datetime.now()
-            + datetime.timedelta(seconds=rsp_json["expires_in"]),
+            datetime.datetime.now() + datetime.timedelta(seconds=rsp_json["expires_in"]),
             rsp_json["refresh_token"],
         )
 
     def _appointments_url(self, resource: Optional[str] = None):
-        return self.APPOINTMENTS_URL_FORMAT.format(self.citizen_id) + (
-            resource if resource is not None else ""
-        )
+        return self.APPOINTMENTS_URL_FORMAT.format(self.citizen_id) + (resource if resource is not None else "")
 
     def _find_appointment(
         self,
-        *,
-        vaccination_type: VaccinationType,
-        variant: Optional[Variant],
-        first_vaccine: Optional[Vaccine],
-        earliest_day: date,
-        latest_day: Optional[date],
+        options: AppointmentOptions,
     ) -> Optional[Dict]:
         """
         Finds an appointment in the user's vaccination centre
 
-        :param earliest_day:    The earliest acceptable day in ISO format (YYYY-MM-DD)
+        :param options: The options for the appointment
 
         :return: The JSON payload if an appointment was found, otherwise None
         """
 
         params = {
             "timeOfDay": "ALL_DAY",
-            "lastDate": earliest_day,
+            "lastDate": options.earliest_day,
             "lastTime": "00:00",
-            "vaccinationType": vaccination_type.value,
+            "vaccinationType": options.vaccination_type.value,
         }
 
-        if variant is not None:
-            params["variant"] = variant.value
+        if options.variant is not None:
+            params["variant"] = options.variant.value
 
-        if first_vaccine is not None:
-            params["firstVaccinationVaccine"] = first_vaccine.value
+        if options.first_vaccine is not None:
+            params["firstVaccinationVaccine"] = options.first_vaccine.value
 
         appt_rsp = self.session.get(
             url_with_params(
@@ -308,10 +313,7 @@ class ImpfChecker:
 
         appt = appt_rsp.json()
 
-        if (
-            latest_day
-            and datetime.date.fromisoformat(appt["vaccinationDate"]) > latest_day
-        ):
+        if options.latest_day and datetime.date.fromisoformat(appt["vaccinationDate"]) > options.latest_day:
             # We found an appointment, but it's too far in the future
             return None
 
@@ -319,36 +321,19 @@ class ImpfChecker:
 
     def find(
         self,
-        vaccination_type: VaccinationType,
-        variant: Optional[Variant] = None,
-        first_vaccine: Optional[Vaccine] = None,
-        earliest_day: Optional[str] = None,
-        latest_day: Optional[str] = None,
-        *,
-        book: bool = False,
+        options: AppointmentOptions,
     ) -> bool:
         """
         Finds an appointment in the user's vaccination centre
 
-        :param vaccination_type: First, second or boost dose
-        :param variant:          Find only appointments with vaccines specifiv to this variant
-        :param first_vaccine:    The vaccine used for the first dose
-        :param earliest_day:     The earliest acceptable day in ISO format (YYYY-MM-DD)
-        :param latest_day:       The latest acceptable day in ISO format (YYYY-MM-DD)
-        :param book:             Whether to book the appointment
+        :param options: The options for the appointment
 
-        :return:                 False if no appointment found or booking failed. True otherwise.
+        :return:        False if no appointment found or booking failed. True otherwise.
         """
-        if earliest_day is None:
-            earliest_day = date.today()
+        if options.earliest_day is None:
+            options.earliest_day = date.today()
 
-        appt = self._find_appointment(
-            vaccination_type=vaccination_type,
-            first_vaccine=first_vaccine,
-            variant=variant,
-            earliest_day=earliest_day.isoformat(),
-            latest_day=latest_day,
-        )
+        appt = self._find_appointment(options)
         if appt is None:
             logging.info("No appointment available")
             return False
@@ -359,12 +344,10 @@ class ImpfChecker:
             appt["vaccinationTime"],
         )
 
-        if book:
+        if options.book:
             return self._book(appt)
         else:
-            self.notify(
-                f"An appointment is available on {appt['vaccinationDate']} at {appt['vaccinationTime']}."
-            )
+            self.notify(f"An appointment is available on {appt['vaccinationDate']} at {appt['vaccinationTime']}.")
 
         return True
 
@@ -404,9 +387,7 @@ class ImpfChecker:
         Prints the upcoming appointments
         """
 
-        appts_rsp = self.session.get(
-            self._appointments_url(), headers=self._headers(with_auth=True)
-        )
+        appts_rsp = self.session.get(self._appointments_url(), headers=self._headers(with_auth=True))
 
         if appts_rsp.status_code != 200:
             logging.error("Error retrieving appointments")
