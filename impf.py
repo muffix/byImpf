@@ -103,6 +103,13 @@ def main():
         required=False,
         help="Variants to find vaccines for; either ba1 or ba45. Leave blank for any.",
     )
+    parser.add_argument(
+        "--ntfy-topic",
+        type=str,
+        default=None,
+        required=False,
+        help="ntfy.sh topic to send a message to on success. See https://ntfy.sh for details.",
+    )
     args = parser.parse_args()
 
     if args.dose == VaccinationType.SECOND and args.first_vaccine is None:
@@ -117,7 +124,10 @@ def main():
     )
 
     checker = ImpfChecker(
-        username=args.email, password=args.password, citizen_id=args.citizen_id
+        username=args.email,
+        password=args.password,
+        citizen_id=args.citizen_id,
+        ntfy_topic=args.ntfy_topic,
     )
 
     if args.interval is not None:

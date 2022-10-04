@@ -58,6 +58,7 @@ class ImpfChecker:
     APPOINTMENTS_URL_FORMAT = (
         "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
     )
+    NTFY_SH_URL = "https://ntfy.sh/"
 
     def auth_token(self):
         if self._auth_token is None:
@@ -68,11 +69,18 @@ class ImpfChecker:
                 exit(1)
         return self._auth_token
 
-    def __init__(self, username: str, password: str, citizen_id: str):
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        citizen_id: str,
+        ntfy_topic: Optional[str] = None,
+    ):
         self._user = username
         self._password = password
         self.citizen_id = citizen_id
         self.session = requests.Session()
+        self._ntfy_topic = ntfy_topic
         self._auth_token: Optional[str] = None
         self._auth_token_expiry: Optional[datetime.datetime] = None
         self._refresh_token: Optional[str] = None
@@ -353,6 +361,10 @@ class ImpfChecker:
 
         if book:
             return self._book(appt)
+        else:
+            self.notify(
+                f"An appointment is available on {appt['vaccinationDate']} at {appt['vaccinationTime']}."
+            )
 
         return True
 
@@ -377,6 +389,14 @@ class ImpfChecker:
             return False
 
         logging.info("Appointment booked.")
+
+        self.notify(
+            (
+                f"Appointment booked for {payload['vaccinationDate']} at {payload['vaccinationTime']}."
+                "Please check your e-mails."
+            )
+        )
+
         return True
 
     def print_appointments(self):
@@ -413,3 +433,26 @@ class ImpfChecker:
                 appt["slotId"]["date"],
                 appt["slotId"]["time"],
             )
+
+    def notify(self, title: str):
+        if not self._ntfy_topic:
+            return
+
+        requests.post(
+            self.NTFY_SH_URL,
+            json={
+                "topic": self._ntfy_topic,
+                "message": title,
+                "title": "",
+                "tags": ["syringe"],
+                "priority": 4,
+                "actions": [
+                    {
+                        "action": "view",
+                        "label": "BayIMCO portal",
+                        "url": f"https://impfzentren.bayern/citizen/overview/{self.citizen_id}",
+                        "clear": True,
+                    }
+                ],
+            },
+        )

@@ -67,6 +67,9 @@ options:
   --first-vaccine-id FIRST_VACCINE_ID
                         The ID of the vaccine that was used for the first jab. Only required for the second vaccination.
   --variant VARIANT     Variants to find vaccines for; either ba1 or ba45. Leave blank for any.
+  --ntfy-topic NTFY_TOPIC
+                        ntfy.sh topic to send a message to on success. See https://ntfy.sh for details.
+
 ```
 
 #### Vaccine IDs
@@ -86,6 +89,11 @@ first jab. In addition to `--dose=second`, add `--first-vaccine-id` according to
 | Comirnaty Original/Omicron BA.1 (BioNTech/Pfizer)   | 009 |
 | Spikevax 0 (Zero)/O (Omicron) (Moderna)             | 010 |
 | Comirnaty Original/Omicron BA.4-5 (BioNTech/Pfizer) | 011 |
+
+#### Notifications
+
+The checker can send a notification to an [ntfy.sh](https://ntfy.sh) topic. Use the `--ntfy-topic` option to specify the
+topic name and subscribe to the notifications on your phone or on the web app.
 
 #### Checking until successful
 
