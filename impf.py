@@ -1,14 +1,19 @@
 import argparse
 import datetime
 import logging
-from typing import Optional
 
 from tenacity import Retrying, wait_fixed
 
-from byimpf.client import ImpfChecker, VaccinationType, Vaccine, Variant
+from byimpf.client import (
+    AppointmentOptions,
+    ImpfChecker,
+    VaccinationType,
+    Vaccine,
+    Variant,
+)
 
 
-def parse_variant(variant: str) -> Optional[Variant]:
+def parse_variant(variant: str) -> Variant:
     variant = variant.lower()
 
     if variant == "ba1":
@@ -130,6 +135,28 @@ def main():
         ntfy_topic=args.ntfy_topic,
     )
 
+    appt_options = AppointmentOptions(
+        earliest_day=args.earliest_day,
+        latest_day=args.latest_day,
+        book=args.book,
+        vaccination_type=args.dose,
+        first_vaccine=args.first_vaccine,
+        variant=args.variant,
+    )
+
+    startup_message = "\n".join(
+        [
+            "Finding an appointment with the following options:",
+            f"E-mail: {args.email}",
+            f"Citizen ID: {args.citizen_id}",
+            f"Notification topic: {args.ntfy_topic}",
+            f"Dose: {args.dose.value}",
+            f"{appt_options}",
+        ]
+    )
+
+    logging.info(startup_message)
+
     if args.interval is not None:
         with checker:
             for i, attempt in enumerate(
@@ -137,24 +164,10 @@ def main():
             ):
                 with attempt:
                     logging.debug("Trying to find appointment (attempt %d)", i)
-                    if not checker.find(
-                        vaccination_type=args.dose,
-                        first_vaccine=args.first_vaccine,
-                        variant=args.variant,
-                        earliest_day=args.earliest_day,
-                        latest_day=args.latest_day,
-                        book=args.book,
-                    ):
+                    if not checker.find(appt_options):
                         raise Exception("Unsuccessful attempt")
     else:
-        checker.find(
-            vaccination_type=args.dose,
-            first_vaccine=args.first_vaccine,
-            variant=args.variant,
-            earliest_day=args.earliest_day,
-            latest_day=args.latest_day,
-            book=args.book,
-        )
+        checker.find(appt_options)
 
     if args.book:
         checker.print_appointments()
