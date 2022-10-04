@@ -1,5 +1,9 @@
 # Changelog
 
+## UNRELEASED
+
+- Added startup message printing the options
+
 ## v1.1.1 - 2022-10-04
 
 - Added support for sending a notification through [ntfy.sh](https://ntfy.sh) on success
