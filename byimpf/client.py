@@ -78,9 +78,7 @@ class ImpfChecker:
     MAIN_PAGE = "https://impfzentren.bayern/citizen/"
     LOGIN_URL = "https://ciam.impfzentren.bayern/auth/realms/C19V-Citizen/protocol/openid-connect/auth"
     TOKEN_URL = "https://ciam.impfzentren.bayern/auth/realms/C19V-Citizen/protocol/openid-connect/token"
-    APPOINTMENTS_URL_FORMAT = (
-        "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
-    )
+    APPOINTMENTS_URL_FORMAT = "https://impfzentren.bayern/api/v1/citizens/{}/appointments"
     NTFY_SH_URL = "https://ntfy.sh/"
 
     def auth_token(self):
@@ -136,9 +134,7 @@ class ImpfChecker:
         self._auth_token = None
         self._refresh_token = None
 
-    def _submit_form(
-        self, url: str, body: Dict[str, str], allow_redirects: bool = True
-    ) -> Response:
+    def _submit_form(self, url: str, body: Dict[str, str], allow_redirects: bool = True) -> Response:
         """
         Submits a form to the API
 
@@ -151,9 +147,7 @@ class ImpfChecker:
 
         return self.session.post(
             url,
-            headers=self._headers(
-                **{"Content-Type": "application/x-www-form-urlencoded"}
-            ),
+            headers=self._headers(**{"Content-Type": "application/x-www-form-urlencoded"}),
             data=body,
             allow_redirects=allow_redirects,
         )
@@ -197,9 +191,7 @@ class ImpfChecker:
         """
         login_form_rsp = self.session.get(self._login_url, headers=self._headers())
         login_form_rsp.raise_for_status()
-        return BeautifulSoup(login_form_rsp.text, "html.parser").find(
-            id="kc-form-login"
-        )["action"]
+        return BeautifulSoup(login_form_rsp.text, "html.parser").find(id="kc-form-login")["action"]
 
     def _login(self):
         """
@@ -226,10 +218,8 @@ class ImpfChecker:
 
     @property
     def is_auth_token_expired(self) -> bool:
-        return (
-            self._auth_token_expiry
-            and self._auth_token_expiry - datetime.datetime.now()
-            < datetime.timedelta(seconds=30)
+        return self._auth_token_expiry and self._auth_token_expiry - datetime.datetime.now() < datetime.timedelta(
+            seconds=30
         )
 
     def refresh_auth_token(self, code: Optional[str] = None):
@@ -271,15 +261,12 @@ class ImpfChecker:
 
         self._auth_token, self._auth_token_expiry, self._refresh_token = (
             rsp_json["access_token"],
-            datetime.datetime.now()
-            + datetime.timedelta(seconds=rsp_json["expires_in"]),
+            datetime.datetime.now() + datetime.timedelta(seconds=rsp_json["expires_in"]),
             rsp_json["refresh_token"],
         )
 
     def _appointments_url(self, resource: Optional[str] = None):
-        return self.APPOINTMENTS_URL_FORMAT.format(self.citizen_id) + (
-            resource if resource is not None else ""
-        )
+        return self.APPOINTMENTS_URL_FORMAT.format(self.citizen_id) + (resource if resource is not None else "")
 
     def _find_appointment(
         self,
@@ -326,11 +313,7 @@ class ImpfChecker:
 
         appt = appt_rsp.json()
 
-        if (
-            options.latest_day
-            and datetime.date.fromisoformat(appt["vaccinationDate"])
-            > options.latest_day
-        ):
+        if options.latest_day and datetime.date.fromisoformat(appt["vaccinationDate"]) > options.latest_day:
             # We found an appointment, but it's too far in the future
             return None
 
@@ -364,9 +347,7 @@ class ImpfChecker:
         if options.book:
             return self._book(appt)
         else:
-            self.notify(
-                f"An appointment is available on {appt['vaccinationDate']} at {appt['vaccinationTime']}."
-            )
+            self.notify(f"An appointment is available on {appt['vaccinationDate']} at {appt['vaccinationTime']}.")
 
         return True
 
@@ -406,9 +387,7 @@ class ImpfChecker:
         Prints the upcoming appointments
         """
 
-        appts_rsp = self.session.get(
-            self._appointments_url(), headers=self._headers(with_auth=True)
-        )
+        appts_rsp = self.session.get(self._appointments_url(), headers=self._headers(with_auth=True))
 
         if appts_rsp.status_code != 200:
             logging.error("Error retrieving appointments")

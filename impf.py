@@ -22,9 +22,7 @@ def parse_variant(variant: str) -> Variant:
     if variant == "ba45":
         return Variant.OMICRON_BA_4_5
 
-    raise ValueError(
-        f"Unknown variant '{variant}'. If passed, must be either ba1 or ba45"
-    )
+    raise ValueError(f"Unknown variant '{variant}'. If passed, must be either ba1 or ba45")
 
 
 def parse_dose(dose: str) -> VaccinationType:
@@ -43,9 +41,7 @@ def parse_dose(dose: str) -> VaccinationType:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Appointment checker and booker for Bavarian vaccination centres"
-    )
+    parser = argparse.ArgumentParser(description="Appointment checker and booker for Bavarian vaccination centres")
     parser.add_argument(
         "--citizen-id",
         type=str,
@@ -55,12 +51,8 @@ def main():
             "Find it in the address bar of your browser after selecting the person in the web portal."
         ),
     )
-    parser.add_argument(
-        "--email", type=str, required=True, help="Your login email address"
-    )
-    parser.add_argument(
-        "--password", type=str, required=True, help="Your login password"
-    )
+    parser.add_argument("--email", type=str, required=True, help="Your login email address")
+    parser.add_argument("--password", type=str, required=True, help="Your login password")
     parser.add_argument(
         "--earliest-day",
         type=datetime.date.fromisoformat,
@@ -118,9 +110,7 @@ def main():
     args = parser.parse_args()
 
     if args.dose == VaccinationType.SECOND and args.first_vaccine is None:
-        raise ValueError(
-            "The ID of the first vaccine must be passed if we're looking for a second dose."
-        )
+        raise ValueError("The ID of the first vaccine must be passed if we're looking for a second dose.")
 
     logging.basicConfig(
         format="%(asctime)s %(levelname)-8s %(message)s",
@@ -159,9 +149,7 @@ def main():
 
     if args.interval is not None:
         with checker:
-            for i, attempt in enumerate(
-                Retrying(wait=wait_fixed(args.interval)), start=1
-            ):
+            for i, attempt in enumerate(Retrying(wait=wait_fixed(args.interval)), start=1):
                 with attempt:
                     logging.debug("Trying to find appointment (attempt %d)", i)
                     if not checker.find(appt_options):
