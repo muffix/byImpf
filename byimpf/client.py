@@ -3,6 +3,7 @@ import logging
 import threading
 import time
 from datetime import date
+from enum import Enum
 from typing import Dict, Optional, Union
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from uuid import uuid4
@@ -17,6 +18,37 @@ def url_with_params(url: str, query_params: Dict[str, str]) -> str:
     scheme, netloc, path, _, fragment = urlsplit(url)
     query_string = urlencode(query_params, doseq=True)
     return urlunsplit((scheme, netloc, path, query_string, fragment))
+
+
+class Variant(Enum):
+    OMICRON_BA_1 = "OMC_BA1"
+    OMICRON_BA_4_5 = "OMC_BA4-5"
+
+
+class VaccinationType(Enum):
+    FIRST = "FIRST"
+    SECOND = "SECOND"
+    BOOST = "BOOST"
+
+
+class Vaccine(Enum):
+    ASTRA_ZENECA = "001"
+    BIONTECH_PFIZER = "002"
+    MODERNA = "003"
+    JANSSEN = "005"
+    NUVAXOVID = "006"
+    VALNEVA = "008"
+    BIONTECH_PFIZER_BA1 = "009"
+    MODERNA_SPIKEVAX_0 = "010"
+    BIONTECH_PFIZER_BA45 = "011"
+
+    @staticmethod
+    def from_id(vaccine_id: str) -> "Vaccine":
+        for v in Vaccine:
+            if v.value == vaccine_id:
+                return v
+
+        raise ValueError("Unknown vaccine ID")
 
 
 class ImpfChecker:
@@ -219,7 +251,13 @@ class ImpfChecker:
         )
 
     def _find_appointment(
-        self, earliest_day, latest_day: Optional[date]
+        self,
+        *,
+        vaccination_type: VaccinationType,
+        variant: Optional[Variant],
+        first_vaccine: Optional[Vaccine],
+        earliest_day: date,
+        latest_day: Optional[date],
     ) -> Optional[Dict]:
         """
         Finds an appointment in the user's vaccination centre
@@ -228,10 +266,24 @@ class ImpfChecker:
 
         :return: The JSON payload if an appointment was found, otherwise None
         """
+
+        params = {
+            "timeOfDay": "ALL_DAY",
+            "lastDate": earliest_day,
+            "lastTime": "00:00",
+            "vaccinationType": vaccination_type.value,
+        }
+
+        if variant is not None:
+            params["variant"] = variant.value
+
+        if first_vaccine is not None:
+            params["firstVaccinationVaccine"] = first_vaccine.value
+
         appt_rsp = self.session.get(
             url_with_params(
                 self._appointments_url("/next"),
-                {"timeOfDay": "ALL_DAY", "lastDate": earliest_day, "lastTime": "00:00"},
+                params,
             ),
             headers=self._headers(with_auth=True),
         )
@@ -259,6 +311,9 @@ class ImpfChecker:
 
     def find(
         self,
+        vaccination_type: VaccinationType,
+        variant: Optional[Variant] = None,
+        first_vaccine: Optional[Vaccine] = None,
         earliest_day: Optional[str] = None,
         latest_day: Optional[str] = None,
         *,
@@ -267,17 +322,25 @@ class ImpfChecker:
         """
         Finds an appointment in the user's vaccination centre
 
-        :param earliest_day:    The earliest acceptable day in ISO format (YYYY-MM-DD)
-        :param latest_day:      The latest acceptable day in ISO format (YYYY-MM-DD)
-        :param book:            Whether to book the appointment
+        :param vaccination_type: First, second or boost dose
+        :param variant:          Find only appointments with vaccines specifiv to this variant
+        :param first_vaccine:    The vaccine used for the first dose
+        :param earliest_day:     The earliest acceptable day in ISO format (YYYY-MM-DD)
+        :param latest_day:       The latest acceptable day in ISO format (YYYY-MM-DD)
+        :param book:             Whether to book the appointment
 
-        :return:    False if no appointment found or booking failed.
-                    True if the booking was successful or an appointment was found and no booking requested.
+        :return:                 False if no appointment found or booking failed. True otherwise.
         """
         if earliest_day is None:
             earliest_day = date.today()
 
-        appt = self._find_appointment(earliest_day.isoformat(), latest_day)
+        appt = self._find_appointment(
+            vaccination_type=vaccination_type,
+            first_vaccine=first_vaccine,
+            variant=variant,
+            earliest_day=earliest_day.isoformat(),
+            latest_day=latest_day,
+        )
         if appt is None:
             logging.info("No appointment available")
             return False

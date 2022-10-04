@@ -1,10 +1,40 @@
 import argparse
 import datetime
 import logging
+from typing import Optional
 
 from tenacity import Retrying, wait_fixed
 
-from byimpf.client import ImpfChecker
+from byimpf.client import ImpfChecker, VaccinationType, Vaccine, Variant
+
+
+def parse_variant(variant: str) -> Optional[Variant]:
+    variant = variant.lower()
+
+    if variant == "ba1":
+        return Variant.OMICRON_BA_1
+
+    if variant == "ba45":
+        return Variant.OMICRON_BA_4_5
+
+    raise ValueError(
+        f"Unknown variant '{variant}'. If passed, must be either ba1 or ba45"
+    )
+
+
+def parse_dose(dose: str) -> VaccinationType:
+    dose = dose.lower()
+
+    if dose in ("first", "1"):
+        return VaccinationType.FIRST
+
+    if dose in ("second", "2"):
+        return VaccinationType.SECOND
+
+    if dose in ("boost", "booster", "3", "4"):
+        return VaccinationType.BOOST
+
+    raise ValueError("Must be either first, second, or boost")
 
 
 def main():
@@ -52,7 +82,33 @@ def main():
         action="store_true",
         help="Whether to print debug log output",
     )
+    parser.add_argument(
+        "--dose",
+        type=parse_dose,
+        default=VaccinationType.BOOST,
+        required=False,
+        help="Which vaccination to looking for: first, second or boost. Defaults to boost.",
+    )
+    parser.add_argument(
+        "--first-vaccine-id",
+        type=Vaccine.from_id,
+        required=False,
+        help="The ID of the vaccine that was used for the first jab. Only required for the second vaccination.",
+        dest="first_vaccine",
+    )
+    parser.add_argument(
+        "--variant",
+        type=parse_variant,
+        default=None,
+        required=False,
+        help="Variants to find vaccines for; either ba1 or ba45. Leave blank for any.",
+    )
     args = parser.parse_args()
+
+    if args.dose == VaccinationType.SECOND and args.first_vaccine is None:
+        raise ValueError(
+            "The ID of the first vaccine must be passed if we're looking for a second dose."
+        )
 
     logging.basicConfig(
         format="%(asctime)s %(levelname)-8s %(message)s",
@@ -72,6 +128,9 @@ def main():
                 with attempt:
                     logging.debug("Trying to find appointment (attempt %d)", i)
                     if not checker.find(
+                        vaccination_type=args.dose,
+                        first_vaccine=args.first_vaccine,
+                        variant=args.variant,
                         earliest_day=args.earliest_day,
                         latest_day=args.latest_day,
                         book=args.book,
@@ -79,7 +138,12 @@ def main():
                         raise Exception("Unsuccessful attempt")
     else:
         checker.find(
-            earliest_day=args.earliest_day, latest_day=args.latest_day, book=args.book
+            vaccination_type=args.dose,
+            first_vaccine=args.first_vaccine,
+            variant=args.variant,
+            earliest_day=args.earliest_day,
+            latest_day=args.latest_day,
+            book=args.book,
         )
 
     if args.book:

@@ -1,7 +1,9 @@
 # Changelog
 
-## UNRELEASED
+## v1.1.0
 
+- Added support for the updated BayIMCO API
+- Added filter to find vaccination appointments against a specific variant, such as BA.1 or BA.4/5
 - Added support for the `--debug` option to additionally print debug output
 
 ## v1.0.3
